@@ -9,6 +9,7 @@ class Meetup extends Model {
         description: Sequelize.TEXT,
         location: Sequelize.STRING,
         times: Sequelize.DATE,
+        subscriptions: Sequelize.ARRAY(Sequelize.INTEGER),
         past: {
           type: Sequelize.VIRTUAL,
           get() {
