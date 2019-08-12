@@ -1,5 +1,6 @@
 import * as Yup from 'yup';
-import { startOfHour, parseISO, isBefore } from 'date-fns';
+import { startOfHour, parseISO, isBefore, addDays } from 'date-fns';
+import { Op } from 'sequelize';
 
 import Meetup from '../models/Meetup';
 import File from '../models/File';
@@ -7,10 +8,23 @@ import User from '../models/User';
 
 class MeetupController {
   async index(req, res) {
+    const { date, page = 1 } = req.query;
+
+    /**
+     * definindo formato de data inicial e final
+     */
+    const timesInitial = parseISO(date);
+    const timesFinish = addDays(parseISO(date), 1);
+
     const meetups = await Meetup.findAll({
-      where: { user_id: req.userId },
+      where: {
+        user_id: req.userId,
+        times: { [Op.between]: [timesInitial, timesFinish] },
+      },
       order: ['times'],
       attributes: ['id', 'title', 'description', 'location', 'times', 'past'],
+      limit: 10,
+      offset: (page - 1) * 10,
       include: [
         {
           model: File,
@@ -108,27 +122,75 @@ class MeetupController {
   }
 
   async update(req, res) {
-    return res.json({ OK: true });
-  }
-
-  async destroy(req, res) {
     const { id } = req.params;
 
-    const { times, user_id } = await Meetup.findByPk(id);
+    const meetup = await Meetup.findByPk(id);
 
-    if (!(user_id === req.userId)) {
+    if (!meetup) {
+      return res.status.json({ error: 'Meetup does not exists.' });
+    }
+
+    if (meetup.past) {
+      return res
+        .status(400)
+        .json({ error: 'You can not update a finished meetup' });
+    }
+
+    if (!(meetup.user_id === req.userId)) {
       return res
         .status(401)
         .json({ error: "You aren't the owner of this meeting" });
     }
 
-    const hourStart = startOfHour(parseISO(times));
+    const hourStart = startOfHour(parseISO(meetup.times));
 
     if (isBefore(hourStart, new Date())) {
       return res.status(400).json({ error: 'Past dates are not permitted.' });
     }
 
-    await Meetup.destroy({ where: { id } });
+    await meetup.update(req.body);
+
+    const {
+      title,
+      description,
+      location,
+      times,
+      banner,
+    } = await Meetup.findByPk(id, {
+      include: [
+        {
+          model: File,
+          as: 'banner',
+          attributes: ['id', 'path', 'url'],
+        },
+      ],
+    });
+
+    return res.json({ id, title, description, location, times, banner });
+  }
+
+  async delete(req, res) {
+    const { id } = req.params;
+
+    const meetup = await Meetup.findByPk(id);
+
+    if (!meetup) {
+      return res.status(400).json({ error: 'This meetup does not exists.' });
+    }
+
+    if (meetup.past) {
+      return res
+        .status(400)
+        .json({ error: 'You can not delete a finished meetup' });
+    }
+
+    if (!(meetup.user_id === req.userId)) {
+      return res
+        .status(400)
+        .json({ error: "You aren't the owner of this meeting" });
+    }
+
+    await meetup.destroy();
 
     return res.json();
   }
