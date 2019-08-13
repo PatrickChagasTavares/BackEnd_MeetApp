@@ -16,6 +16,9 @@ class MeetupController {
     const timesInitial = parseISO(date);
     const timesFinish = addDays(parseISO(date), 1);
 
+    /**
+     * Buscando dados
+     */
     const meetups = await Meetup.findAll({
       where: {
         user_id: req.userId,
