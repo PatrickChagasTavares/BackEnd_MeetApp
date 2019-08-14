@@ -5,11 +5,48 @@ import User from '../models/User';
 
 class SubscriptionController {
   async index(req, res) {
-    return res.json();
+    /**
+     * Crie uma rota para listar os meetups em que o usuário logado está inscrito.
+     * Liste apenas meetups que ainda não passaram e ordene meetups mais próximos como primeiros da lista.
+     */
+
+     const meetup = Meetup.findAll(
+       {
+         where: {
+         subscriptions: { [Op.contains]: [req.userId] },
+         times: {[Op.gt]: new Date()},
+        },
+        order: ['times'],
+        attributes: ['id', 'title', 'description', 'location', 'times', 'banner', 'user', 'avatar'],
+        limit: 10,
+        offset: (page - 1) * 10,
+         include: [
+          {
+            model: File,
+            as: 'banner',
+            attributes: ['id', 'path', 'url'],
+          },
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id'],
+            include: [
+              {
+                model: File,
+                as: 'avatar',
+                attributes: ['id', 'path', 'url'],
+              },
+            ],
+          },
+         ],
+        });
+
+      return res.json(meetup);
   }
 
   async store(req, res) {
-    const meetup = await Meetup.findByPk(req.params.id);
+    
+    const meetup = await Meetup.findByPk(req.body.id);
 
     if (!meetup) {
       return res.status(400).json({ error: 'Meetup does not exists.' });
