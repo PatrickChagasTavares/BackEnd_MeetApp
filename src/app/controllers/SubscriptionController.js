@@ -1,4 +1,6 @@
 import { Op } from 'sequelize';
+import { subHours, isBefore } from 'date-fns';
+
 import Meetup from '../models/Meetup';
 import File from '../models/File';
 import User from '../models/User';
@@ -10,42 +12,41 @@ class SubscriptionController {
      * Liste apenas meetups que ainda não passaram e ordene meetups mais próximos como primeiros da lista.
      */
 
-     const meetup = Meetup.findAll(
-       {
-         where: {
-         subscriptions: { [Op.contains]: [req.userId] },
-         times: {[Op.gt]: new Date()},
-        },
-        order: ['times'],
-        attributes: ['id', 'title', 'description', 'location', 'times', 'banner', 'user', 'avatar'],
-        limit: 10,
-        offset: (page - 1) * 10,
-         include: [
-          {
-            model: File,
-            as: 'banner',
-            attributes: ['id', 'path', 'url'],
-          },
-          {
-            model: User,
-            as: 'user',
-            attributes: ['id'],
-            include: [
-              {
-                model: File,
-                as: 'avatar',
-                attributes: ['id', 'path', 'url'],
-              },
-            ],
-          },
-         ],
-        });
+    const { page = 1 } = req.query;
 
-      return res.json(meetup);
+    const meetup = await Meetup.findAll({
+      where: {
+        subscriptions: { [Op.contains]: [req.userId] },
+        times: { [Op.gt]: new Date() },
+      },
+      order: [['times', 'DESC']],
+      limit: 10,
+      offset: (page - 1) * 10,
+      include: [
+        {
+          model: File,
+          as: 'banner',
+          attributes: ['id', 'path', 'url'],
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id'],
+          include: [
+            {
+              model: File,
+              as: 'avatar',
+              attributes: ['id', 'path', 'url'],
+            },
+          ],
+        },
+      ],
+    });
+
+    return res.json(meetup);
   }
 
   async store(req, res) {
-    
     const meetup = await Meetup.findByPk(req.body.id);
 
     if (!meetup) {
@@ -100,11 +101,9 @@ class SubscriptionController {
       location,
       times,
       subscriptions,
-      createdAt,
-      updatedAt,
-      user_id,
       banner,
-    } = await Meetup.findByPk(req.params.id, {
+      user,
+    } = await Meetup.findByPk(req.body.id, {
       include: [
         {
           model: File,
@@ -126,16 +125,6 @@ class SubscriptionController {
       ],
     });
 
-    const { name, avatar } = User.findByPk(user_id, {
-      include: [
-        {
-          model: File,
-          as: 'avatar',
-          attributes: ['path', 'url'],
-        },
-      ],
-    });
-
     return res.json({
       id,
       title,
@@ -143,12 +132,8 @@ class SubscriptionController {
       location,
       times,
       subscriptions,
-      createdAt,
-      updatedAt,
       banner,
-      user_id,
-      name,
-      avatar,
+      user,
     });
   }
 
@@ -159,11 +144,10 @@ class SubscriptionController {
       return res.status(400).json({ error: 'Meetup does not exists.' });
     }
 
-    if (meetup.user_id === req.userId) {
-      return res.status(400).json({
-        error:
-          'you can not canceled subscription for the meetup that you is owner',
-      });
+    if (!meetup.subscriptions.includes(req.userId)) {
+      return res
+        .status(401)
+        .json({ error: 'User is not subscribed in meetup' });
     }
 
     if (meetup.past) {
@@ -172,10 +156,12 @@ class SubscriptionController {
         .json({ error: 'You can not canceled subscription a finished meetup' });
     }
 
-    if (!meetup.subscriptions.includes(req.userId)) {
-      return res
-        .status(401)
-        .json({ error: 'User is not subscribed in meetup' });
+    const dataWithSub = subHours(meetup.date, 2);
+
+    if (isBefore(dataWithSub, new Date())) {
+      return res.status(401).json({
+        error: 'You can only cancel subscribed 2 hours in advance.',
+      });
     }
 
     const removeSubscribed = subs => {
