@@ -1,9 +1,11 @@
 import { Op } from 'sequelize';
-import { subHours, isBefore } from 'date-fns';
+import { subHours, isBefore, format } from 'date-fns';
+import pt from 'date-fns/locale/pt';
 
 import Meetup from '../models/Meetup';
 import File from '../models/File';
 import User from '../models/User';
+import Notification from '../schemas/Notification';
 
 class SubscriptionController {
   async index(req, res) {
@@ -123,6 +125,19 @@ class SubscriptionController {
           ],
         },
       ],
+    });
+
+    /**
+     * Notify Subscribed in Meetup
+     */
+    const userSubscribed = await User.findByPk(req.userId);
+    const formattedDate = format(times, "'dia' dd 'de' MMMM', às' H:mm'h'", {
+      locale: pt,
+    });
+
+    await Notification.create({
+      content: `${userSubscribed.name} se inscriveu para o Meetup ${title} do ${formattedDate} `,
+      user_id: user.id,
     });
 
     return res.json({
