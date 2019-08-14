@@ -1,5 +1,11 @@
 import * as Yup from 'yup';
-import { startOfHour, parseISO, isBefore, addDays } from 'date-fns';
+import {
+  startOfHour,
+  parseISO,
+  isBefore,
+  startOfDay,
+  endOfDay,
+} from 'date-fns';
 import { Op } from 'sequelize';
 
 import Meetup from '../models/Meetup';
@@ -13,8 +19,7 @@ class MeetupController {
     /**
      * definindo formato de data inicial e final
      */
-    const timesInitial = parseISO(date);
-    const timesFinish = addDays(parseISO(date), 1);
+    const parsedDate = parseISO(date);
 
     /**
      * Buscando dados
@@ -22,7 +27,7 @@ class MeetupController {
     const meetups = await Meetup.findAll({
       where: {
         user_id: req.userId,
-        times: { [Op.between]: [timesInitial, timesFinish] },
+        times: { [Op.between]: [startOfDay(parsedDate), endOfDay(parsedDate)] },
       },
       order: ['times'],
       attributes: ['id', 'title', 'description', 'location', 'times', 'past'],
