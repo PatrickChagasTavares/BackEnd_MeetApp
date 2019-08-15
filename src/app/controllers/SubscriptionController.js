@@ -7,6 +7,9 @@ import File from '../models/File';
 import User from '../models/User';
 import Notification from '../schemas/Notification';
 
+import SubscriptionMail from '../jobs/SubscriptionMail';
+import Queue from '../../lib/Queue';
+
 class SubscriptionController {
   async index(req, res) {
     /**
@@ -115,7 +118,7 @@ class SubscriptionController {
         {
           model: User,
           as: 'user',
-          attributes: ['id'],
+          attributes: ['id', 'name', 'email'],
           include: [
             {
               model: File,
@@ -130,7 +133,11 @@ class SubscriptionController {
     /**
      * Notify Subscribed in Meetup
      */
-    const userSubscribed = await User.findByPk(req.userId);
+    const userSubscribed = await User.findByPk(req.userId, {
+      include: [
+        { model: File, as: 'avatar', attributes: ['id', 'path', 'url'] },
+      ],
+    });
     const formattedDate = format(times, "'dia' dd 'de' MMMM', às' H:mm'h'", {
       locale: pt,
     });
@@ -138,6 +145,13 @@ class SubscriptionController {
     await Notification.create({
       content: `${userSubscribed.name} se inscriveu para o Meetup ${title} do ${formattedDate} `,
       user_id: user.id,
+    });
+
+    await Queue.add(SubscriptionMail.key, {
+      title,
+      times,
+      user,
+      userSubscribed,
     });
 
     return res.json({
@@ -185,7 +199,7 @@ class SubscriptionController {
     };
     const AlterSub = removeSubscribed(meetup.subscriptions);
 
-    await meetup.update(AlterSub);
+    await meetup.update({ subscriptions: AlterSub });
 
     const {
       id,
