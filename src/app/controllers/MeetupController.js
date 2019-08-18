@@ -12,6 +12,9 @@ import Meetup from '../models/Meetup';
 import File from '../models/File';
 import User from '../models/User';
 
+import CancelationMeetupMail from '../jobs/CancelationMeetupMail';
+import Queue from '../../lib/Queue';
+
 class MeetupController {
   async index(req, res) {
     const { date, page = 1 } = req.query;
@@ -180,7 +183,11 @@ class MeetupController {
   async delete(req, res) {
     const { id } = req.params;
 
-    const meetup = await Meetup.findByPk(id);
+    const meetup = await Meetup.findByPk(id, {
+      include: [
+        { model: File, as: 'banner', attributes: ['id', 'path', 'url'] },
+      ],
+    });
 
     if (!meetup) {
       return res.status(400).json({ error: 'This meetup does not exists.' });
@@ -197,6 +204,26 @@ class MeetupController {
         .status(400)
         .json({ error: "You aren't the owner of this meeting" });
     }
+
+    /**
+     * send mail to inform cancelation meetup
+     */
+
+    meetup.subscriptions.map(async a => {
+      const Subcribed = await User.findByPk(a);
+
+      if (Subcribed !== null) {
+        await Queue.add(CancelationMeetupMail.key, {
+          name: Subcribed.name,
+          email: Subcribed.email,
+          title: meetup.title,
+          picture: meetup.banner.url,
+          description: meetup.description,
+          location: meetup.location,
+          times: meetup.times,
+        });
+      }
+    });
 
     await meetup.destroy();
 
