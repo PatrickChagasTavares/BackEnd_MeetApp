@@ -17,40 +17,13 @@ import Queue from '../../lib/Queue';
 
 class MeetupController {
   async index(req, res) {
-    const { date, page = 1 } = req.query;
-
-    /**
-     * definindo formato de data inicial e final
-     */
-    const parsedDate = parseISO(date);
-
-    /**
-     * Buscando dados
-     */
-    const meetups = await Meetup.findAll({
-      where: {
-        user_id: req.userId,
-        times: { [Op.between]: [startOfDay(parsedDate), endOfDay(parsedDate)] },
-      },
+    const meetup = await Meetup.findAll({
+      where: { user_id: req.userId },
       order: ['times'],
-      attributes: ['id', 'title', 'description', 'location', 'times', 'past'],
-      limit: 10,
-      offset: (page - 1) * 10,
-      include: [
-        {
-          model: File,
-          as: 'banner',
-          attributes: ['id', 'path', 'url'],
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'name'],
-        },
-      ],
+      attributes: ['past', 'id', 'title', 'times'],
     });
 
-    return res.json(meetups);
+    return res.json(meetup);
   }
 
   async store(req, res) {
@@ -130,6 +103,43 @@ class MeetupController {
       times,
       banner,
     });
+  }
+
+  async show(req, res) {
+    const { date, page = 1 } = req.query;
+
+    /**
+     * definindo formato de data inicial e final
+     */
+    const parsedDate = parseISO(date);
+
+    /**
+     * Buscando dados
+     */
+    const meetups = await Meetup.findAll({
+      where: {
+        user_id: req.userId,
+        times: { [Op.between]: [startOfDay(parsedDate), endOfDay(parsedDate)] },
+      },
+      order: ['times'],
+      attributes: ['id', 'title', 'description', 'location', 'times', 'past'],
+      limit: 10,
+      offset: (page - 1) * 10,
+      include: [
+        {
+          model: File,
+          as: 'banner',
+          attributes: ['id', 'path', 'url'],
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name'],
+        },
+      ],
+    });
+
+    return res.json(meetups);
   }
 
   async update(req, res) {
