@@ -6,6 +6,7 @@ import UserController from './app/controllers/UserController';
 import SessionControler from './app/controllers/SessionController';
 import FileController from './app/controllers/FileController';
 import MeetupController from './app/controllers/MeetupController';
+import SubscribedController from './app/controllers/SubscribedController';
 import SubscriptionController from './app/controllers/SubscriptionController';
 import NotificationController from './app/controllers/NotificationController';
 
@@ -21,17 +22,20 @@ routes.use(authMiddleware);
 
 routes.put('/users', UserController.update);
 
-routes.post('/meetups', MeetupController.store);
 routes.get('/meetups', MeetupController.index);
+routes.get('/meetups/:id', MeetupController.show);
+routes.post('/meetups', MeetupController.store);
 routes.put('/meetups/:id', MeetupController.update);
 routes.delete('/meetups/:id', MeetupController.delete);
+
+routes.get('/subscribed', SubscribedController.index);
 
 routes.get('/subscription', SubscriptionController.index);
 routes.post('/subscription', SubscriptionController.store);
 routes.delete('/subscription/:id', SubscriptionController.delete);
 
 routes.get('/notification', NotificationController.index);
-routes.put('/notification', NotificationController.update);
+routes.put('/notification/:id', NotificationController.update);
 
 routes.post('/files', upload.single('file'), FileController.store);
 

@@ -1,12 +1,5 @@
 import * as Yup from 'yup';
-import {
-  startOfHour,
-  parseISO,
-  isBefore,
-  startOfDay,
-  endOfDay,
-} from 'date-fns';
-import { Op } from 'sequelize';
+import { startOfHour, parseISO, isBefore } from 'date-fns';
 
 import Meetup from '../models/Meetup';
 import File from '../models/File';
@@ -39,6 +32,8 @@ class MeetupController {
     }
 
     const { image_id, times } = req.body;
+
+    console.log(req.body);
 
     /**
      * Check for past dates
@@ -106,25 +101,8 @@ class MeetupController {
   }
 
   async show(req, res) {
-    const { date, page = 1 } = req.query;
-
-    /**
-     * definindo formato de data inicial e final
-     */
-    const parsedDate = parseISO(date);
-
-    /**
-     * Buscando dados
-     */
-    const meetups = await Meetup.findAll({
-      where: {
-        user_id: req.userId,
-        times: { [Op.between]: [startOfDay(parsedDate), endOfDay(parsedDate)] },
-      },
-      order: ['times'],
+    const meetup = await Meetup.findByPk(req.params.id, {
       attributes: ['id', 'title', 'description', 'location', 'times', 'past'],
-      limit: 10,
-      offset: (page - 1) * 10,
       include: [
         {
           model: File,
@@ -134,12 +112,23 @@ class MeetupController {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name'],
+          attributes: ['id'],
+          include: [
+            {
+              model: File,
+              as: 'avatar',
+              attributes: ['id', 'path', 'url'],
+            },
+          ],
         },
       ],
     });
 
-    return res.json(meetups);
+    if (!meetup) {
+      return res.status(401).json({ error: 'Meetup does not exists' });
+    }
+
+    return res.json(meetup);
   }
 
   async update(req, res) {
