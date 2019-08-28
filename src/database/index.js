@@ -27,13 +27,10 @@ class Database {
    * conection with database not relationships
    */
   mongo() {
-    this.mongoConnection = mongoose.connect(
-      'mongodb://localhost:27017/meetApp',
-      {
-        useNewUrlParser: true,
-        useFindAndModify: true,
-      }
-    );
+    this.mongoConnection = mongoose.connect(process.env.MONGO_URL, {
+      useNewUrlParser: true,
+      useFindAndModify: true,
+    });
   }
 }
 
